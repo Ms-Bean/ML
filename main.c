@@ -12,10 +12,9 @@ int main(void)
     printf("Augmented matrix:\n");
     m_print(&m);
     printf("\nRow-echelon form:\n");
-    m_row_echelon(&m);
+    m_reduced_row_echelon(&m);
     m_print(&m);
-    
-    printf("\nSolution:\n"); 
+    printf("Solutions\n");
     solution = m_back_substitution(&m);
     m_print(&solution);
     return 0;

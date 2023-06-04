@@ -127,6 +127,35 @@ void m_swap_rows(Matrix *dst, long a, long b)
 }
 void m_row_echelon(Matrix *dst)
 {
+    long h = 0;
+    long k = 0;
+
+    while(h < dst->rows && k < dst->cols)
+    {
+        for(long m = h + 1; m < dst->rows; m++)
+        {
+            if(!is_equal(dst->contents[m * dst->cols + k], 0.0, 0.0001))
+            {
+                m_swap_rows(dst, m, h);
+                for(long i = h + 1; i < dst->rows; i++)
+                {
+                    double weight = dst->contents[i * dst->cols + k] / dst->contents[h * dst->cols + k];
+                    dst->contents[i * dst->cols + k] = 0.0;
+                    for(long j = k + 1; j < dst->cols; j++)
+                    {
+                        dst->contents[i * dst->cols + j] -= dst->contents[h * dst->cols + j] * weight;
+                    }
+                }
+                h++;
+                k++;
+                continue;
+            }
+        }
+        k++;
+    }
+}
+void m_reduced_row_echelon(Matrix *dst)
+{
     for(long i = 0; i < dst->rows; i++)
     {
         for(long j = 0; j < dst->cols; j++)
@@ -154,8 +183,10 @@ void m_row_echelon(Matrix *dst)
             {
                 dst->contents[i * dst->cols + k] *= weight;
             }
-            for(k = i + 1; k < dst->rows; k++)
+            for(k = 0; k < dst->rows; k++)
             {
+                if(k == i)
+                    continue;
                 if(!is_equal(dst->contents[k * dst->cols + j], 0, 0.0001))
                 {
                     weight = -dst->contents[k * dst->cols + j];
@@ -173,11 +204,14 @@ Matrix m_back_substitution(Matrix *src)
 {
     Matrix out;
     out.rows = out.cols = 0;
+    if(src->cols > src->rows + 1)
+    {
+        return out;
+    }
     for(long i = 0; i < src->cols - 1; i++)
     {
-        if(!is_equal(src->contents[i * src->cols + i], 1.0, 0.0001))
+        if(is_equal(src->contents[i * src->cols + i], 0.0, 0.0001))
         {
-            printf("%ld\n", i);
             return out;
         }
     }
@@ -191,7 +225,7 @@ Matrix m_back_substitution(Matrix *src)
         {
             sum -= src->contents[i * src->cols + j] * out.contents[j];
         }
-        out.contents[i] = sum;
+        out.contents[i] = sum / src->contents[i * src->cols + i];
     }
     return out;
 }
