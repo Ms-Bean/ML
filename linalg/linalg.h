@@ -125,7 +125,7 @@ void m_swap_rows(Matrix *dst, long a, long b)
         dst->contents[b * dst->cols + i] = temp;
     }
 }
-void m_reduced_echelon(Matrix *dst)
+void m_row_echelon(Matrix *dst)
 {
     for(long i = 0; i < dst->rows; i++)
     {

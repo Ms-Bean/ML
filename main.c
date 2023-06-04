@@ -11,8 +11,8 @@ int main(void)
     m_copy_c_matrix(dat, &m);
     printf("Augmented matrix:\n");
     m_print(&m);
-    printf("\nReduced row-echelon form:\n");
-    m_reduced_echelon(&m);
+    printf("\nRow-echelon form:\n");
+    m_row_echelon(&m);
     m_print(&m);
     
     printf("\nSolution:\n"); 
