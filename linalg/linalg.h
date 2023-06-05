@@ -12,9 +12,9 @@ double dot_product(double *a, double *b, long len)
         sum += a[i] * b[i];
     return sum;
 }
-int is_equal(double a, double b, double epsilon)
+int is_equal(double a, double b)
 {
-    return fabs(a - b) < epsilon;
+    return fabs(a - b) <= 1e-5 * fabs(a);
 }
 typedef struct Matrix
 {
@@ -35,6 +35,13 @@ Matrix m_init(long rows, long cols)
 void m_destroy(Matrix *dst)
 {
     free(dst->contents);
+}
+void m_copy(Matrix *src, Matrix *dst)
+{
+    for(long i = 0; i < src->cols * src->rows; i++)
+    {
+        dst->contents[i] = src->contents[i];
+    }
 }
 double v_Lnorm(Matrix *src, long L)
 {
@@ -132,9 +139,9 @@ void m_row_echelon(Matrix *dst)
 
     while(h < dst->rows && k < dst->cols)
     {
-        for(long m = h + 1; m < dst->rows; m++)
+        for(long m = h; m < dst->rows; m++)
         {
-            if(!is_equal(dst->contents[m * dst->cols + k], 0.0, 0.0001))
+            if(!is_equal(dst->contents[m * dst->cols + k], 0.0))
             {
                 m_swap_rows(dst, m, h);
                 for(long i = h + 1; i < dst->rows; i++)
@@ -164,7 +171,7 @@ void m_reduced_row_echelon(Matrix *dst)
             double weight;
             for(k = i; k < dst->rows; k++)
             {
-                if(!is_equal(dst->contents[k * dst->cols + j], 0.0, 0.0001))
+                if(!is_equal(dst->contents[k * dst->cols + j], 0.0))
                 {
                     if(k == i)
                     {
@@ -187,7 +194,7 @@ void m_reduced_row_echelon(Matrix *dst)
             {
                 if(k == i)
                     continue;
-                if(!is_equal(dst->contents[k * dst->cols + j], 0, 0.0001))
+                if(!is_equal(dst->contents[k * dst->cols + j], 0.0))
                 {
                     weight = -dst->contents[k * dst->cols + j];
                     for(long l = 0; l < dst->cols; l++)
@@ -208,15 +215,17 @@ Matrix m_back_substitution(Matrix *src)
     {
         return out;
     }
-    for(long i = 0; i < src->cols - 1; i++)
-    {
-        if(is_equal(src->contents[i * src->cols + i], 0.0, 0.0001))
-        {
-            return out;
-        }
-    }
 
-    out = m_init(src->cols-1, 1);
+    for(long i = 0; i < src->cols - 1; i++)
+        if(is_equal(src->contents[i * src->cols + i], 0.0))
+            return out;
+
+    for(long i = 0; i < src->rows; i++)
+        for(long j = 0; j < i; j++)
+            if(!is_equal(src->contents[i * src->cols + j], 0.0))
+                return out;
+
+    out = m_init(1, src->cols-1);
     double sum = 0;
     for(long i = src->cols - 2; i >= 0; i--)
     {
@@ -244,6 +253,106 @@ double m_frobenius_norm(Matrix *src)
         sum += (src->contents[i]*src->contents[i]);       
 
     return sqrt(sum);
+}
+int m_inverse(Matrix *src, Matrix *dst)
+{
+    Matrix temp = m_init(dst->rows, dst->cols*2);
+    for(long i = 0; i < temp.rows; i++)
+    {
+        temp.contents[i * (temp.cols + 1) + temp.rows] = 1.0;
+    }
+    for(long i = 0; i < dst->rows; i++)
+        for(long j = 0; j < dst->cols; j++)
+            temp.contents[i * temp.cols + j] = src->contents[i * dst->cols + j];
+    
+    m_reduced_row_echelon(&temp);
+
+    for(long i = 0; i < dst->rows; i++)
+        for(long j = 0; j < dst->cols; j++)
+            dst->contents[i * dst->cols + j] = temp.contents[i * temp.cols + temp.rows + j];
+    
+    for(long i = 0; i < temp.rows; i++)
+    {
+        for(long j = 0; j < temp.rows; j++)
+        {
+            if(i == j && !is_equal(temp.contents[2 * i * temp.cols + j], 1.0))
+            {
+                m_destroy(&temp);
+                return 0;
+            }
+            else if(i != j && !is_equal(temp.contents[2 * i * temp.cols + j], 0.0))
+            {
+                m_destroy(&temp);
+                return 0;
+            }
+        }
+    } 
+    m_destroy(&temp);
+    return 1;
+}
+int m_column_linear_independent(Matrix *src)
+{
+    Matrix temp;
+
+    if(src->cols > src->rows)
+        return 0;
+
+    temp = m_init(src->rows, src->cols);
+    m_copy(src, &temp);
+    m_row_echelon(&temp);
+    printf("\n");
+    m_print(&temp);
+
+    for(long i = 0; i < temp.cols; i++)
+    {  
+        long j;
+        for(j = 0; j < i; j++)
+        {
+            if(!is_equal(temp.contents[i * temp.cols + j], 0.0))
+            {
+                m_destroy(&temp);
+                return 0;
+            }
+        }
+        if(is_equal(temp.contents[i * temp.cols + i], 0.0))
+        {
+            m_destroy(&temp);
+            return 0;
+        }
+    } 
+    m_destroy(&temp);
+    return 1;
+}
+int m_row_linear_independent(Matrix *src)
+{
+    Matrix temp;
+
+    if(src->rows > src->cols)
+        return 0;
+
+    temp = m_create_transpose(src);
+    m_copy(src, &temp);
+    m_row_echelon(&temp);
+
+    for(long i = 0; i < temp.cols; i++)
+    {  
+        long j;
+        for(j = 0; j < i; j++)
+        {
+            if(!is_equal(temp.contents[i * temp.cols + j], 0.0))
+            {
+                m_destroy(&temp);
+                return 0;
+            }
+        }
+        if(is_equal(temp.contents[i * temp.cols + i], 0.0))
+        {
+            m_destroy(&temp);
+            return 0;
+        }
+    } 
+    m_destroy(&temp);
+    return 1;
 }
 typedef struct Tensor
 {
