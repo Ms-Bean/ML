@@ -14,7 +14,7 @@ double dot_product(double *a, double *b, long len)
 }
 int is_equal(double a, double b)
 {
-    return fabs(a - b) <= 1e-5 * fabs(a);
+    return fabs(a - b) <= 1e-9 * fabs(a) + fabs(b) + 1e-9; 
 }
 typedef struct Matrix
 {
@@ -300,8 +300,6 @@ int m_column_linear_independent(Matrix *src)
     temp = m_init(src->rows, src->cols);
     m_copy(src, &temp);
     m_row_echelon(&temp);
-    printf("\n");
-    m_print(&temp);
 
     for(long i = 0; i < temp.cols; i++)
     {  
@@ -327,11 +325,10 @@ int m_row_linear_independent(Matrix *src)
 {
     Matrix temp;
 
-    if(src->rows > src->cols)
+    if(src->cols > src->rows)
         return 0;
 
     temp = m_create_transpose(src);
-    m_copy(src, &temp);
     m_row_echelon(&temp);
 
     for(long i = 0; i < temp.cols; i++)

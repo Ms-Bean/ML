@@ -8,15 +8,12 @@ int main(void)
 {
     Matrix m;
 
-    double dat[4][4] = {{4,12,8,-2},{2,4,0,1},{9,18,0,1},{1,2,0,5}};
+    double dat[4][4] = {{1,-2,1,-1},{-4,-2,0,4},{2,3,-1,-3},{17,-10,11,1}};
     m = m_init(4, 4);
     m_copy_c_matrix(dat, &m);
 
     printf("Matrix:\n");
     m_print(&m);
-
-    m_row_echelon(&m);
-    printf("\n");
-    m_print(&m);
+    printf("\nLinearly independent columns: %s\n", m_column_linear_independent(&m) ? "Yes" : "No");
     return 0;
 }
