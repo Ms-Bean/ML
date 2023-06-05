@@ -14,6 +14,7 @@ int main(void)
 
     printf("Matrix:\n");
     m_print(&m);
-    printf("\nLinearly independent columns: %s\n", m_column_linear_independent(&m) ? "Yes" : "No");
+    printf("\nLinearly independent columns: %s\n", m_row_linear_independent(&m) ? "Yes" : "No");
+    printf("Rank: %ld\n", m_rank(&m));
     return 0;
 }

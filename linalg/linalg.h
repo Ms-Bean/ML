@@ -302,22 +302,13 @@ int m_column_linear_independent(Matrix *src)
     m_row_echelon(&temp);
 
     for(long i = 0; i < temp.cols; i++)
-    {  
-        long j;
-        for(j = 0; j < i; j++)
-        {
-            if(!is_equal(temp.contents[i * temp.cols + j], 0.0))
-            {
-                m_destroy(&temp);
-                return 0;
-            }
-        }
+    {
         if(is_equal(temp.contents[i * temp.cols + i], 0.0))
         {
             m_destroy(&temp);
             return 0;
         }
-    } 
+    }
     m_destroy(&temp);
     return 1;
 }
@@ -332,24 +323,40 @@ int m_row_linear_independent(Matrix *src)
     m_row_echelon(&temp);
 
     for(long i = 0; i < temp.cols; i++)
-    {  
-        long j;
-        for(j = 0; j < i; j++)
-        {
-            if(!is_equal(temp.contents[i * temp.cols + j], 0.0))
-            {
-                m_destroy(&temp);
-                return 0;
-            }
-        }
+    {
         if(is_equal(temp.contents[i * temp.cols + i], 0.0))
         {
             m_destroy(&temp);
             return 0;
         }
-    } 
+    }
     m_destroy(&temp);
     return 1;
+}
+long m_rank(Matrix *src)
+{
+    Matrix temp;
+    long rank = 0;
+
+    if(src->cols > src->rows)
+        return 0;
+
+    temp = m_create_transpose(src);
+    m_row_echelon(&temp);
+
+    long i = 0;
+    long j = 0;
+    while(j < temp.cols)
+    {
+        if(!is_equal(temp.contents[i * temp.cols + j], 0.0))
+        {
+            rank++;
+            i++;
+        }
+        j++;
+    }
+    m_destroy(&temp);
+    return rank;
 }
 typedef struct Tensor
 {
