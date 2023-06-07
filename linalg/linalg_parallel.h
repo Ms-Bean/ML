@@ -20,8 +20,7 @@ void *_m_mult_parallel(void *arg)
     Matrix *dst = dat->dst;
 
     pthread_mutex_lock(&mutex);
-        long starting_index = dat->starting_index;
-        dat->starting_index++;
+        long starting_index = dat->starting_index++;
     pthread_mutex_unlock(&mutex);
 
     for(long i = starting_index; i < src1->rows; i += NUM_THREADS)

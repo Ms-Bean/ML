@@ -16,9 +16,8 @@ typedef struct Matrix
     double *contents;  
 } Matrix; 
 
-/*Matrix functions*/
+/*Vector functions*/
 double v_Lnorm(Matrix *src, long L);
-void v_change_of_basis(Matrix *src, Matrix *dst, Matrix *old_basis, Matrix *new_basis);
 
 /*Matrix creation and destruction functions*/
 Matrix m_init(long rows, long cols);
