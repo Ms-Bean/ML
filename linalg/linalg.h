@@ -4,6 +4,75 @@
 #include <string.h>
 #include <stdio.h>
 
+
+/*Misc functions*/
+double dot_product(double *a, double *b, long len);
+int is_equal(double a, double b);
+
+typedef struct Matrix
+{                       /*M00   M01    M02*/
+    long rows;          /*M10   M11    M12*/
+    long cols;          /*M20   M21    M22*/
+    double *contents;  
+} Matrix; 
+
+/*Matrix functions*/
+double v_Lnorm(Matrix *src, long L);
+void v_change_of_basis(Matrix *src, Matrix *dst, Matrix *old_basis, Matrix *new_basis);
+
+/*Matrix creation and destruction functions*/
+Matrix m_init(long rows, long cols);
+Matrix m_create_transpose(Matrix *src);
+Matrix m_create_identity_matrix(long I);
+Matrix m_create_diag(Matrix *src);
+void m_destroy(Matrix *dst);
+void m_copy(Matrix *src, Matrix *dst);
+void m_copy_c_matrix(void *src, Matrix *dst);
+
+/*Visualization*/
+void m_print(Matrix *src);
+void m_label_print(Matrix *src, char *label);
+
+/*Matrix manipulation*/
+void m_transpose(Matrix *src, Matrix *dst);
+void m_mult(Matrix *src1, Matrix *src2, Matrix *dst);
+void m_scmult(double scalar, Matrix *dst);
+void m_hadamard(Matrix *src1, Matrix *src2, Matrix *dst);
+void m_swap_rows(Matrix *dst, long a, long b);
+int m_inverse(Matrix *src, Matrix *dst); /*Returns true iff inverse was successfuly taken*/
+
+/*Useful for solving systems of linear equations*/
+void m_row_echelon(Matrix *dst); 
+void m_reduced_row_echelon(Matrix *dst);
+Matrix m_back_substitution(Matrix *src); /*Takes in augmented matrix in row-echelon, returns a vector containing the solution to the system if there is one*/
+
+/*Matrix statistics*/
+double m_trace(Matrix *src);
+double m_frobenius_norm(Matrix *src);
+int m_row_linear_independent(Matrix *src);
+int m_column_linear_independent(Matrix *src);
+long m_rank(Matrix *src);
+
+typedef struct Tensor
+{
+    long rank;
+    long *dims;
+    
+    double *contents;
+} Tensor;
+Tensor t_init(long rank, ...);
+Tensor _t_init(long rank, long *dims);
+long *_t_index_weights(Tensor *t1);;
+long t_num_elements(Tensor *t1);
+void _t_print_linear(Tensor *t1, long d_index, long l, long r, long *index_weights);
+void t_print_linear(Tensor *t1);
+double t_get(Tensor *src, ...);
+void t_set(Tensor *dst, double val, ...);
+void t_add(Tensor *t1, Tensor *t2, Tensor *dst);
+void t_transpose(Tensor *src, Tensor *dst);
+Tensor t_create_transpose(Tensor *src);
+void t_copy_c_tensor(Tensor *dst, double *src, int num_elements);
+
 double dot_product(double *a, double *b, long len)
 {
     double sum;
@@ -16,13 +85,6 @@ int is_equal(double a, double b)
 {
     return fabs(a - b) <= 1e-9 * fabs(a) + fabs(b) + 1e-9; 
 }
-typedef struct Matrix
-{
-    long rows;
-    long cols;
-    double *contents;  
-} Matrix;
-
 Matrix m_init(long rows, long cols)
 {
     Matrix out;
@@ -52,8 +114,54 @@ double v_Lnorm(Matrix *src, long L)
     }
     return pow(sum, 1.0/L);
 }
+Matrix m_create_transition_matrix(Matrix *src1, Matrix *src2)
+{
+    Matrix out;
+    Matrix augmented_matrix;
+    Matrix solution;
+
+    out = m_init(src1->rows, src1->cols);
+    augmented_matrix = m_init(src1->rows, src1->cols + 1);
+    for(long i = 0; i < src1->cols; i++)
+    {
+        for(long j = 0; j < src2->rows; j++)
+        {
+            long k;
+            for(k = 0; k < src2->cols; k++)
+            {
+                augmented_matrix.contents[j * augmented_matrix.cols + k] = src2->contents[j * src2->cols + k];
+            }
+            augmented_matrix.contents[j * augmented_matrix.cols + k] = src1->contents[j * src1->cols + i];
+        }
+        m_row_echelon(&augmented_matrix);
+        solution = m_back_substitution(&augmented_matrix);
+        for(long j = 0; j < solution.rows; j++)
+        {
+            out.contents[j * out.cols + i] = solution.contents[j];
+        }
+    }
+    m_destroy(&solution);
+    m_destroy(&augmented_matrix);
+    return out;
+}
 void m_print(Matrix *src)
 {
+    for(long i = 0; i < src->rows; i++)
+    {
+        printf("[");
+        for(long j = 0; j < src->cols; j++)
+        {
+            printf("%8.3lf", src->contents[i * src->cols + j]);
+            if(j < src->cols-1)
+                printf(", ");
+        }
+        printf("]\n");
+    }
+    printf("\n");
+}
+void m_label_print(Matrix *src, char *label)
+{
+    printf("%s\n", label);
     for(long i = 0; i < src->rows; i++)
     {
         printf("[");
@@ -65,6 +173,7 @@ void m_print(Matrix *src)
         }
         printf("]\n");
     }
+    printf("\n");
 }
 void m_copy_c_matrix(void *src, Matrix *dst)
 {
@@ -225,7 +334,7 @@ Matrix m_back_substitution(Matrix *src)
             if(!is_equal(src->contents[i * src->cols + j], 0.0))
                 return out;
 
-    out = m_init(1, src->cols-1);
+    out = m_init(src->cols-1, 1);
     double sum = 0;
     for(long i = src->cols - 2; i >= 0; i--)
     {
@@ -267,10 +376,6 @@ int m_inverse(Matrix *src, Matrix *dst)
     
     m_reduced_row_echelon(&temp);
 
-    for(long i = 0; i < dst->rows; i++)
-        for(long j = 0; j < dst->cols; j++)
-            dst->contents[i * dst->cols + j] = temp.contents[i * temp.cols + temp.rows + j];
-    
     for(long i = 0; i < temp.rows; i++)
     {
         for(long j = 0; j < temp.rows; j++)
@@ -287,6 +392,10 @@ int m_inverse(Matrix *src, Matrix *dst)
             }
         }
     } 
+    for(long i = 0; i < dst->rows; i++)
+        for(long j = 0; j < dst->cols; j++)
+            dst->contents[i * dst->cols + j] = temp.contents[i * temp.cols + temp.rows + j];
+    
     m_destroy(&temp);
     return 1;
 }
@@ -338,15 +447,12 @@ long m_rank(Matrix *src)
     Matrix temp;
     long rank = 0;
 
-    if(src->cols > src->rows)
-        return 0;
-
     temp = m_create_transpose(src);
     m_row_echelon(&temp);
 
     long i = 0;
     long j = 0;
-    while(j < temp.cols)
+    while(j < temp.cols && i < temp.rows)
     {
         if(!is_equal(temp.contents[i * temp.cols + j], 0.0))
         {
@@ -358,13 +464,6 @@ long m_rank(Matrix *src)
     m_destroy(&temp);
     return rank;
 }
-typedef struct Tensor
-{
-    long rank;
-    long *dims;
-    
-    double *contents;
-} Tensor;
 
 Tensor _t_init(long rank, long *dims)
 {
@@ -510,7 +609,6 @@ void t_transpose(Tensor *src, Tensor *dst)
             }
         }
     }
-
     free(indices);
     free(index_weights);
 }

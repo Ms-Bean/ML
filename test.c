@@ -1,20 +1,37 @@
-#include "linalg/linalg.h"
-struct test
-{
+#include "linalg/linalg_parallel.h"
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/time.h>
 
-    char a[5];
-};
 int main(void)
 {
-    Matrix m;
+    Matrix m1;
+    Matrix m2;
+    Matrix mult;
 
-    double dat[4][4] = {{1,-2,1,-1},{-4,-2,0,4},{2,3,-1,-3},{17,-10,11,1}};
-    m = m_init(4, 4);
-    m_copy_c_matrix(dat, &m);
+    m1 = m_init(1000, 1000);
+    m2 = m_init(1000, 1000);
 
-    printf("Matrix:\n");
-    m_print(&m);
-    printf("\nLinearly independent columns: %s\n", m_row_linear_independent(&m) ? "Yes" : "No");
-    printf("Rank: %ld\n", m_rank(&m));
+    for(long i = 0; i < 1000000; i++)
+    {
+        m1.contents[i] = i / 10000;
+        m2.contents[i] = (1000000 - i) / 10000;
+    }
+
+    mult = m_init(1000, 1000);
+
+    long A[400][400];
+    struct timeval start, stop;
+    gettimeofday(&start, NULL);
+    m_mult(&m1, &m2, &mult);
+    gettimeofday(&stop, NULL);
+    printf("Time spent on regular mult: %f\n", (stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000);
+    
+    gettimeofday(&start, NULL);
+    m_mult_parallel(&m2, &m1, &mult);
+    gettimeofday(&stop, NULL);
+    printf("Time spent on parallel mult: %f\n", (stop.tv_sec - start.tv_sec) + (double)(stop.tv_usec - start.tv_usec) / 1000000);
+
     return 0;
 }
