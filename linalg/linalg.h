@@ -346,6 +346,76 @@ Matrix m_back_substitution(Matrix *src)
     }
     return out;
 }
+double m_determinant(Matrix *src)
+{
+    Matrix triangle = m_init(src->rows, src->cols);
+
+    m_copy(src, &triangle);
+    m_row_echelon(&triangle);
+    double product = 1.0;
+    for(long i = 0; i < src->rows; i++)
+    {
+        product *= triangle.contents[i * (triangle.cols + 1)];
+    }
+    return product;
+}
+void m_qr_factorization(Matrix *src, Matrix *q, Matrix *r) /*Modified gram-schmidt*/
+{
+    *q = m_init(src->rows, src->cols);
+    m_copy(src, q);
+    
+    *r = m_init(src->rows, src->cols);
+
+    for(long i = 0; i < src->rows; i++)
+    {
+        double s = 0;
+        for(long j = 0; j < i; j++)
+        {
+            double s = 0.0;
+            for(long k = 0; k < q->rows; k++)
+            {
+                s += q->contents[k * q->cols + i] * q->contents[k * q->cols + j];
+            }
+            r->contents[j * q->cols + i] = s;
+            for(long k = 0; k < q->rows; k++)
+            {
+                q->contents[k * q->cols + i] -= s * q->contents[k * q->cols + j];
+            }
+        }
+        double norm = 0;
+        for(long j = 0; j < q->rows; j++)
+        {
+            norm += q->contents[j * q->cols + i]*q->contents[j * q->cols + i];
+        }
+        norm = sqrt(norm);
+        r->contents[i * (r->cols + 1)] = norm;
+        for(long j = 0; j < q->cols; j++)
+        {
+            q->contents[j * q->cols + i] /= norm;
+        }
+    }
+}
+Matrix m_eigenvalues(Matrix *src, long iterations)
+{
+    Matrix q, r;
+    Matrix a = m_init(src->rows, src->cols);
+    Matrix out = m_init(src->rows, 1);
+
+    m_copy(src, &a);
+    for(long i = 0; i < iterations; i++)
+    {
+        m_qr_factorization(&a, &q, &r);
+        m_mult(&r, &q, &a);
+        m_destroy(&q);
+        m_destroy(&r);
+    }
+    for(long i = 0; i < a.rows; i++)
+    {
+        out.contents[i] = a.contents[i * (a.cols + 1)];
+    }
+    m_destroy(&a);
+    return out;
+}
 double m_trace(Matrix *src)
 {
     double sum = 0;
