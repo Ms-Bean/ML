@@ -4,10 +4,10 @@
 #include <string.h>
 #include <stdio.h>
 
-
 /*Misc functions*/
 double dot_product(double *a, double *b, long len);
 int is_equal(double a, double b);
+int is_equal_e(double a, double b, double epsilon1, double epsilon2);
 
 typedef struct Matrix
 {                       /*M00   M01    M02*/
@@ -84,6 +84,10 @@ int is_equal(double a, double b)
 {
     return fabs(a - b) <= 1e-9 * fabs(a) + fabs(b) + 1e-9; 
 }
+int is_equal_e(double a, double b, double epsilon1, double epsilon2)
+{
+    return fabs(a - b) <= epsilon1 * fabs(a) + fabs(b) + epsilon2; 
+}
 Matrix m_init(long rows, long cols)
 {
     Matrix out;
@@ -150,7 +154,7 @@ void m_print(Matrix *src)
         printf("[");
         for(long j = 0; j < src->cols; j++)
         {
-            printf("%8.3lf", src->contents[i * src->cols + j]);
+            printf("%8.5lf", src->contents[i * src->cols + j]);
             if(j < src->cols-1)
                 printf(", ");
         }
@@ -166,7 +170,7 @@ void m_label_print(Matrix *src, char *label)
         printf("[");
         for(long j = 0; j < src->cols; j++)
         {
-            printf("%0.3lf", src->contents[i * src->cols + j]);
+            printf("%8.5lf", src->contents[i * src->cols + j]);
             if(j < src->cols-1)
                 printf(", ");
         }
@@ -395,7 +399,7 @@ void m_qr_factorization(Matrix *src, Matrix *q, Matrix *r) /*Modified gram-schmi
         }
     }
 }
-Matrix m_eigenvalues(Matrix *src, long iterations)
+Matrix m_eigenvalues(Matrix *src, long iterations) /*Returns a column vector of eigenvalues*/
 {
     Matrix q, r;
     Matrix a = m_init(src->rows, src->cols);
@@ -414,6 +418,53 @@ Matrix m_eigenvalues(Matrix *src, long iterations)
         out.contents[i] = a.contents[i * (a.cols + 1)];
     }
     m_destroy(&a);
+    return out;
+}
+Matrix m_eigenvectors(Matrix *src) /*Returns a matrix with eigenvectors listed as columns*/
+{
+    Matrix out;
+    out = m_init(src->rows, src->cols);
+
+    Matrix eigenvalues = m_eigenvalues(src, 100);
+    Matrix augmented_matrix = m_init(src->rows, src->cols + 1);
+    for(long i = 0; i < eigenvalues.rows; i++)
+    {
+        for(long j = 0; j < src->rows; j++)
+        {
+            long k;
+            for(k = 0; k < src->cols; k++)
+            {
+                augmented_matrix.contents[augmented_matrix.cols * j + k] = src->contents[src->cols * j + k];
+            }
+            augmented_matrix.contents[augmented_matrix.cols * j + k] = 0;
+        }
+        for(long j = 0; j < src->rows; j++)
+        {
+            augmented_matrix.contents[j * (augmented_matrix.cols + 1)] -= eigenvalues.contents[i];
+        }
+
+        m_row_echelon(&augmented_matrix);
+
+        if(!is_equal_e(augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 1], 0.0, 1e-4, 1e-4) || !is_equal_e(augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 2], 0.0, 1e-4, 1e-4))
+        {
+            printf("%0.16lf\n", augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 1]);
+            printf("Eigenvector computation failed for eigenvalue %0.16lf\n", eigenvalues.contents[i]);
+        }
+        augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 1] = 1;
+        augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 2] = 1;
+        Matrix solution = m_back_substitution(&augmented_matrix);
+        if(solution.rows != 0)
+        {
+            for(long j = 0; j < solution.rows; j++)
+            {
+                out.contents[j * out.cols + i] = solution.contents[j];
+            }
+        }
+        m_destroy(&solution);
+    }
+    m_destroy(&augmented_matrix);
+    m_destroy(&eigenvalues);
+
     return out;
 }
 double m_trace(Matrix *src)
@@ -533,7 +584,82 @@ long m_rank(Matrix *src)
     m_destroy(&temp);
     return rank;
 }
+Matrix m_read_csv(char *filename)
+{
+    FILE *fp;
+    Matrix out;
 
+    fp = fopen(filename, "r");
+
+    long column_count = 0;
+    long row_count = 0;
+
+    int c;
+    while((c = getc(fp)) != EOF)
+    {
+        if((c == ',' || c == '\n') && row_count == 0)
+        {
+            column_count++;
+        }
+        if(c == '\n')
+        {
+            row_count++;
+        }
+    }
+    fclose(fp);
+    out = m_init(row_count, column_count);
+
+    long int_val = 0;
+    double decimal_val = 0.0;
+    int is_negative = 0;
+    double divisor = 1.0;
+
+    long row = 0;
+    long column = 0;
+
+    fp = fopen(filename, "r");
+    while((c = getc(fp)) != EOF)
+    {
+        if(c == '-')
+        {
+            is_negative = 1;
+        }
+        else if(c == ',' || c == '\n')
+        {
+            out.contents[row * out.cols + column] = is_negative ? -decimal_val - int_val : decimal_val + int_val;
+
+            int_val = decimal_val = 0;
+            divisor = 1;
+            is_negative = 0;
+
+            if(c == ',')
+                column++;
+            else if(c == '\n')
+            {
+                column = 0;
+                row++;
+            }
+        }
+        else if(divisor == 1)
+        {
+            if(c == '.')
+            {
+                divisor *= 10;
+            }
+            else
+            {
+                int_val = int_val * 10 + c - '0';
+            }
+        }
+        else
+        {
+            decimal_val += (double)(c - '0')/divisor;
+            divisor *= 10;
+        }
+    }
+    fclose(fp);
+    return out;
+}
 Tensor _t_init(long rank, long *dims)
 {
     Tensor out;
