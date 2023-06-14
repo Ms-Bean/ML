@@ -10,6 +10,7 @@ int main(int argc, char **argv)
     Matrix cov = m_create_covariance_matrix(&m);
     Matrix eigen = m_eigenvectors(&cov);
 
+    
     for(long i = 0; i < eigen.cols; i++)
     {
         long j;
