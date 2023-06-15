@@ -292,7 +292,10 @@ void m_row_echelon(Matrix *dst)
         {
             if(!is_equal(dst->contents[m * dst->cols + k], 0.0))
             {
-                m_swap_rows(dst, m, h);
+                if(m != h)
+                {
+                    m_swap_rows(dst, m, h);
+                }
                 for(long i = h + 1; i < dst->rows; i++)
                 {
                     double weight = dst->contents[i * dst->cols + k] / dst->contents[h * dst->cols + k];
@@ -309,6 +312,40 @@ void m_row_echelon(Matrix *dst)
         }
         k++;
     }
+}
+long m_row_echelon_count_swaps(Matrix *dst)
+{
+    long h = 0;
+    long k = 0;
+    long swaps = 0;
+    while(h < dst->rows && k < dst->cols)
+    {
+        for(long m = h; m < dst->rows; m++)
+        {
+            if(!is_equal(dst->contents[m * dst->cols + k], 0.0))
+            {
+                if(m != h)
+                {
+                    m_swap_rows(dst, m, h);
+                    swaps++;
+                }
+                for(long i = h + 1; i < dst->rows; i++)
+                {
+                    double weight = dst->contents[i * dst->cols + k] / dst->contents[h * dst->cols + k];
+                    dst->contents[i * dst->cols + k] = 0.0;
+                    for(long j = k + 1; j < dst->cols; j++)
+                    {
+                        dst->contents[i * dst->cols + j] -= dst->contents[h * dst->cols + j] * weight;
+                    }
+                }
+                h++;
+                k++;
+                continue;
+            }
+        }
+        k++;
+    }
+    return swaps;
 }
 void m_reduced_row_echelon(Matrix *dst)
 {
@@ -393,13 +430,42 @@ double m_determinant(Matrix *src)
     Matrix triangle = m_init(src->rows, src->cols);
 
     m_copy(src, &triangle);
-    m_row_echelon(&triangle);
+    long swaps = m_row_echelon_count_swaps(&triangle);
     double product = 1.0;
     for(long i = 0; i < src->rows; i++)
     {
         product *= triangle.contents[i * (triangle.cols + 1)];
     }
-    return product;
+    if(swaps % 2 == 0)
+        return product;
+    return -product;
+}
+/*Cholesky-banachiewicz algorithm, returns lower triangular matrix L where A=LL(transpose)*/
+Matrix m_cholesky_factor(Matrix *src)
+{
+    Matrix out = m_init(src->rows, src->cols);
+
+    for(long i = 0; i < src->rows; i++)
+    {
+        for(long j = 0; j <= i; j++)
+        {
+            double sum = 0;
+            for(long k = 0; k < j; k++)
+            {
+                sum += out.contents[i * out.cols + k] * out.contents[j * out.cols + k];
+            }
+
+            if(j == i)
+            {
+                out.contents[i * out.cols + j] = sqrt(src->contents[i * (src->cols + 1)] - sum);
+            }
+            else
+            {
+                out.contents[i * out.cols + j] = 1.0/out.contents[j * (out.cols + 1)] * (src->contents[i * src->cols + j] - sum);
+            }
+        }
+    }
+    return out;
 }
 /*Returns a column vector containing the mean of each variable in a data matrix*/
 Matrix m_mean(Matrix *src)
