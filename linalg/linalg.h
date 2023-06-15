@@ -8,6 +8,7 @@
 double dot_product(double *a, double *b, long len);
 int is_equal(double a, double b);
 int is_equal_e(double a, double b, double epsilon1, double epsilon2);
+void quicksort_descending(double *arr, long low, long high);
 
 typedef struct Matrix
 {                       /*M00   M01    M02*/
@@ -21,9 +22,7 @@ double v_Lnorm(Matrix *src, long L);
 
 /*Matrix creation and destruction functions*/
 Matrix m_init(long rows, long cols);
-Matrix m_create_transpose(Matrix *src);
-Matrix m_create_identity_matrix(long I);
-Matrix m_create_diag(Matrix *src);
+Matrix m_read_csv(char *filename);
 void m_destroy(Matrix *dst);
 void m_copy(Matrix *src, Matrix *dst);
 void m_copy_c_matrix(void *src, Matrix *dst);
@@ -38,12 +37,15 @@ void m_mult(Matrix *src1, Matrix *src2, Matrix *dst);
 void m_scmult(double scalar, Matrix *dst);
 void m_hadamard(Matrix *src1, Matrix *src2, Matrix *dst);
 void m_swap_rows(Matrix *dst, long a, long b);
-int m_inverse(Matrix *src, Matrix *dst); /*Returns true iff inverse was successfuly taken*/
+int m_inverse(Matrix *src, Matrix *dst); 
+Matrix m_create_transpose(Matrix *src);
+Matrix m_create_identity_matrix(long I);
+Matrix m_create_diag(Matrix *src);
 
 /*Useful for solving systems of linear equations*/
 void m_row_echelon(Matrix *dst); 
 void m_reduced_row_echelon(Matrix *dst);
-Matrix m_back_substitution(Matrix *src); /*Takes in augmented matrix in row-echelon, returns a vector containing the solution to the system if there is one*/
+Matrix m_back_substitution(Matrix *src); 
 
 /*Matrix statistics*/
 double m_trace(Matrix *src);
@@ -51,6 +53,12 @@ double m_frobenius_norm(Matrix *src);
 int m_row_linear_independent(Matrix *src);
 int m_column_linear_independent(Matrix *src);
 long m_rank(Matrix *src);
+
+/*Data matrix manipulation*/
+Matrix m_create_covariance_matrix(Matrix *src);
+
+/*Machine learning algorithms*/
+Matrix m_PCA(Matrix *src, Matrix *proj, long k);
 
 typedef struct Tensor
 {
@@ -88,6 +96,31 @@ int is_equal_e(double a, double b, double epsilon1, double epsilon2)
 {
     return fabs(a - b) <= epsilon1 * fabs(a) + fabs(b) + epsilon2; 
 }
+
+void quicksort_descending(double *arr, long low, long high)
+{
+	long i, j;
+	double pivot, temp;
+	if(low >= high)
+		return;
+	pivot = arr[high];
+	for(j = i = low; j <= high - 1; j++)
+	{
+		if(arr[j] >= pivot)
+		{
+			temp = arr[i];
+			arr[i] = arr[j];
+			arr[j] = temp;
+			i++;
+		}
+	}
+	temp = arr[i];
+	arr[i] = arr[j];
+	arr[j] = temp;
+	quicksort_descending(arr, low, i-1);
+	quicksort_descending(arr, i+1, high);
+}
+
 Matrix m_init(long rows, long cols)
 {
     Matrix out;
@@ -108,10 +141,14 @@ void m_copy(Matrix *src, Matrix *dst)
         dst->contents[i] = src->contents[i];
     }
 }
+double m_get(Matrix *src, long row, long col)
+{
+    return src->contents[row * src->cols + col];
+}
 double v_Lnorm(Matrix *src, long L)
 {
     double sum;
-    for(long i = 0; i < src->cols; i++)
+    for(long i = 0; i < src->cols*src->rows; i++)
     {
         sum += pow(src->contents[i], L);
     }
@@ -319,7 +356,8 @@ void m_reduced_row_echelon(Matrix *dst)
         }
     }
 }
-Matrix m_back_substitution(Matrix *src)
+/*Takes in an augmented matrix in REF, returns a column vector of solutions to the system of linear equations*/
+Matrix m_back_substitution(Matrix *src) 
 {
     Matrix out;
     out.rows = out.cols = 0;
@@ -363,7 +401,60 @@ double m_determinant(Matrix *src)
     }
     return product;
 }
-void m_qr_factorization(Matrix *src, Matrix *q, Matrix *r) /*Modified gram-schmidt*/
+/*Returns a column vector containing the mean of each variable in a data matrix*/
+Matrix m_mean(Matrix *src)
+{
+    Matrix out = m_init(src->cols, 1);
+    for(long i = 0; i < src->rows; i++)
+    {
+        for(long j = 0; j < src->cols; j++)
+        {
+            out.contents[j] += src->contents[i * src->cols + j];
+        }
+    }
+    for(long i = 0; i < out.rows; i++)
+    {
+        out.contents[i] /= src->rows;
+    }
+    return out;
+}
+/*Returns a column vector containing the standard deviation of each variable in a data matrix*/
+Matrix m_stdev(Matrix *src)
+{
+    Matrix means = m_mean(src);
+    Matrix out = m_init(src->cols, 1);
+
+    for(long i = 0; i < src->rows; i++)
+    {
+        for(long j = 0; j < src->cols; j++)
+        {
+            out.contents[j] += (means.contents[j] - src->contents[i * src->cols + j])*(means.contents[j] - src->contents[i * src->cols + j]);
+        }
+    }
+    for(long i = 0; i < out.rows; i++)
+    {
+        out.contents[i] = sqrt(out.contents[i] / (src->rows-1));
+    }
+    m_destroy(&means);
+    return out;
+}
+/*Takes in a data matrix, performs Z-score normalization*/
+void m_standardize(Matrix *dst)
+{
+    Matrix means = m_mean(dst);
+    Matrix stdevs = m_stdev(dst);
+    for(long i = 0; i < dst->rows; i++)
+    {
+        for(long j = 0; j < dst->cols; j++)
+        {
+            dst->contents[i * dst->cols + j] = (dst->contents[i * dst->cols + j] - means.contents[j]) / stdevs.contents[j];
+        }
+    }
+    m_destroy(&means);
+    m_destroy(&stdevs);
+}
+/*q and r should be pointers to uninitialized matrices*/
+void m_qr_factorization(Matrix *src, Matrix *q, Matrix *r) 
 {
     *q = m_init(src->rows, src->cols);
     m_copy(src, q);
@@ -399,7 +490,8 @@ void m_qr_factorization(Matrix *src, Matrix *q, Matrix *r) /*Modified gram-schmi
         }
     }
 }
-Matrix m_eigenvalues(Matrix *src, long iterations) /*Returns a column vector of eigenvalues*/
+ /*Performs iterations iterations of QR algorithm, returns a column vector of eigenvalues*/
+Matrix m_eigenvalues(Matrix *src, long iterations)
 {
     Matrix q, r;
     Matrix a = m_init(src->rows, src->cols);
@@ -420,12 +512,15 @@ Matrix m_eigenvalues(Matrix *src, long iterations) /*Returns a column vector of 
     m_destroy(&a);
     return out;
 }
-Matrix m_eigenvectors(Matrix *src) /*Returns a matrix with eigenvectors listed as columns*/
+/*Returns a matrix with eigenvectors listed as columns. Eigenvectors will have L2 norms equal to 1, and will be in descending order by eigenvalue*/
+Matrix m_eigenvectors(Matrix *src)
 {
     Matrix out;
     out = m_init(src->rows, src->cols);
 
     Matrix eigenvalues = m_eigenvalues(src, 100);
+    quicksort_descending(eigenvalues.contents, 0, eigenvalues.rows-1);
+
     Matrix augmented_matrix = m_init(src->rows, src->cols + 1);
     for(long i = 0; i < eigenvalues.rows; i++)
     {
@@ -453,8 +548,11 @@ Matrix m_eigenvectors(Matrix *src) /*Returns a matrix with eigenvectors listed a
         augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 1] = 1;
         augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 2] = 1;
         Matrix solution = m_back_substitution(&augmented_matrix);
+
         if(solution.rows != 0)
         {
+            double weight = 1.0/v_Lnorm(&solution, 2);
+            m_scmult(weight, &solution);
             for(long j = 0; j < solution.rows; j++)
             {
                 out.contents[j * out.cols + i] = solution.contents[j];
@@ -466,6 +564,28 @@ Matrix m_eigenvectors(Matrix *src) /*Returns a matrix with eigenvectors listed a
     m_destroy(&eigenvalues);
 
     return out;
+}
+/*Takes in a data matrix, hopefully a standardized one, and reduces to k dimensional dataset. Compute v@proj to project column vector v onto the lower-dimensional plane*/
+Matrix m_PCA_dimensionality_reduction(Matrix *src, Matrix *proj, long k)
+{
+    Matrix covariance_matrix = m_create_covariance_matrix(src);
+    Matrix eigenvector_matrix = m_eigenvectors(&covariance_matrix);
+    m_destroy(&covariance_matrix);
+    *proj = m_init(eigenvector_matrix.rows, k);
+
+    for(long i = 0; i < proj->rows; i++)
+    {
+        for(long j = 0; j < k; j++)
+        {
+            proj->contents[i * proj->cols + j] = eigenvector_matrix.contents[i * eigenvector_matrix.cols + j];
+        }
+    }
+    m_destroy(&eigenvector_matrix);
+
+    Matrix new = m_init(src->rows, k);
+    m_mult(src, proj, &new);
+
+    return new;    
 }
 double m_trace(Matrix *src)
 {
@@ -483,6 +603,7 @@ double m_frobenius_norm(Matrix *src)
 
     return sqrt(sum);
 }
+ /*Calculates inverse if there is one, returns false iff there is none.*/
 int m_inverse(Matrix *src, Matrix *dst)
 {
     Matrix temp = m_init(dst->rows, dst->cols*2);
@@ -519,6 +640,7 @@ int m_inverse(Matrix *src, Matrix *dst)
     m_destroy(&temp);
     return 1;
 }
+/*Returns true iff all columns in matrix are linearly independent*/
 int m_column_linear_independent(Matrix *src)
 {
     Matrix temp;
@@ -541,6 +663,7 @@ int m_column_linear_independent(Matrix *src)
     m_destroy(&temp);
     return 1;
 }
+ /*Returns true iff all rows in matrix are linearly independent*/
 int m_row_linear_independent(Matrix *src)
 {
     Matrix temp;
@@ -584,6 +707,7 @@ long m_rank(Matrix *src)
     m_destroy(&temp);
     return rank;
 }
+ /*Reads a CSV file of floating point values, converts to data matrix*/
 Matrix m_read_csv(char *filename)
 {
     FILE *fp;
@@ -595,6 +719,7 @@ Matrix m_read_csv(char *filename)
     long row_count = 0;
 
     int c;
+    while((c = getc(fp)) != '\n' && c != EOF);
     while((c = getc(fp)) != EOF)
     {
         if((c == ',' || c == '\n') && row_count == 0)
@@ -618,6 +743,7 @@ Matrix m_read_csv(char *filename)
     long column = 0;
 
     fp = fopen(filename, "r");
+    while((c = getc(fp)) != '\n' && c != EOF);
     while((c = getc(fp)) != EOF)
     {
         if(c == '-')
@@ -658,6 +784,43 @@ Matrix m_read_csv(char *filename)
         }
     }
     fclose(fp);
+    return out;
+}
+/*Takes in a data matrix, creates a covariance matrix*/
+Matrix m_create_covariance_matrix(Matrix *src)
+{
+    Matrix out = m_init(src->cols, src->cols);
+
+    for(long i = 0; i < out.rows; i++)
+    {
+        for(long j = i; j < out.cols; j++)
+        {
+            double mean_i, mean_j;
+            mean_i = mean_j = 0;
+            for(long k = 0; k < src->rows; k++)
+            {
+                mean_i += src->contents[k * src->cols + i];
+                mean_j += src->contents[k * src->cols + j];
+            }
+            mean_i /= src->rows;
+            mean_j /= src->rows;
+
+            double covar = 0;
+            for(long k = 0; k < src->rows; k++)
+            {
+               covar += (src->contents[k * src->cols + i] - mean_i)*(src->contents[k * src->cols + j] - mean_j);
+            }
+            covar /= src->rows;
+            out.contents[i * out.cols + j] = covar;
+        }
+    }
+    for(long i = 0; i < out.rows; i++)
+    {
+        for(long j = 0; j < i; j++)
+        {
+            out.contents[i * out.cols + j] = out.contents[j * out.cols + i];
+        }
+    }
     return out;
 }
 Tensor _t_init(long rank, long *dims)
