@@ -23,7 +23,7 @@ for i in range(10):
 
 f = plt.figure(1)
 ax = plt.axes(projection="3d")
-ax.scatter3D(x_axis, y_axis, z_axis, c=z_axis, s=55)
+ax.scatter3D(x_axis, y_axis, z_axis, c=z_axis, s=85)
 f.show()
 f.show()
 
@@ -46,7 +46,7 @@ for row in reader:
     b_axis.append(float(row['b']))
 
 g = plt.figure(2)
-plt.scatter(a_axis, b_axis, s=55)
+plt.scatter(a_axis, b_axis, s=85)
 g.show()
 
 plt.show()
