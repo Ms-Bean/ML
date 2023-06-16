@@ -3,7 +3,5 @@
 
 
 Things done so far:
-/*
   - A crude linear algebra library
   - A PCA implementation and example program
-*/
