@@ -58,7 +58,7 @@ long m_rank(Matrix *src);
 Matrix m_create_covariance_matrix(Matrix *src);
 
 /*Machine learning algorithms*/
-Matrix m_PCA(Matrix *src, Matrix *proj, long k);
+Matrix m_PCA_dimensionality_reduction(Matrix *src, Matrix *proj, long k);
 
 typedef struct Tensor
 {

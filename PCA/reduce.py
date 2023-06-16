@@ -1,7 +1,6 @@
 import csv
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
-import subprocess
 import numpy as np
 import os
 
@@ -14,7 +13,7 @@ cov = [[11.50, 50.0, 34.75],
        ]
 mean = [0,0,0]
 
-for i in range(10):
+for i in range(100):
     x, y, z = np.random.multivariate_normal(cov=cov, mean=mean)
     x_axis.append(x)
     y_axis.append(y)
@@ -30,7 +29,7 @@ f.show()
 f = open("trivariate.csv", "w")
 writer = csv.writer(f)
 writer.writerow(['x', 'y', 'z'])
-for i in range(10):
+for i in range(100):
     writer.writerow([x_axis[i], y_axis[i], z_axis[i]])
 f.close()
 
