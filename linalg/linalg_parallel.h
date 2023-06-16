@@ -37,13 +37,14 @@ void *_m_mult_parallel(void *arg)
     }
     return NULL;
 }
-void m_mult_parallel(Matrix *src1, Matrix *src2, Matrix *dst)
+Matrix m_mult_parallel(Matrix *src1, Matrix *src2)
 {
-    Matrix src2_transpose = m_create_transpose(src2);
+    Matrix out = m_init(src1->rows, src2->cols);
+    Matrix src2_transpose = m_transpose(src2);
 
     pthread_t *tids = malloc(sizeof(pthread_t) * NUM_THREADS);
-    struct mult_data *dat; 
-    dat = malloc(sizeof(struct mult_data));
+    struct mult_data *dat = malloc(sizeof(struct mult_data));
+
     dat->src1 = src1;
     dat->src2_transpose = &src2_transpose;
     dat->dst = dst;
