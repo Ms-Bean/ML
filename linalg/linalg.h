@@ -4,12 +4,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/*Misc functions*/
-double dot_product(double *a, double *b, long len);
-int is_equal(double a, double b);
-int is_equal_e(double a, double b, double epsilon1, double epsilon2);
-void quicksort_descending(double *arr, long low, long high);
-
 typedef struct Matrix
 {                       /*M00   M01    M02*/
     long rows;          /*M10   M11    M12*/
@@ -17,68 +11,56 @@ typedef struct Matrix
     double *contents;  
 } Matrix; 
 
-/*Vector functions*/
-double v_Lnorm(Matrix *src, long L);
+/*Misc functions*/
+double dot_product(double *a, double *b, long len);
+int is_equal(double a, double b);
+int is_equal_e(double a, double b, double epsilon1, double epsilon2);
+void quicksort_descending(double *arr, long low, long high);
 
-/*Matrix creation and destruction functions*/
+
 Matrix m_init(long rows, long cols);
+Matrix m_copy(Matrix *src);
+Matrix m_copy_c_matrix(void *src, long rows, long cols);
 Matrix m_read_csv(char *filename);
 void m_destroy(Matrix *dst);
-void m_copy(Matrix *src, Matrix *dst);
-void m_copy_c_matrix(void *src, Matrix *dst);
 
-/*Visualization*/
+double m_get(Matrix *src, long row, long col);
+void m_set(Matrix *dst, long row, long col, double val);
+
+double v_Lnorm(Matrix *src, long L);
+double m_determinant(Matrix *src);
+double m_trace(Matrix *src);
+double m_frobenius_norm(Matrix *src);
+int m_column_linear_independent(Matrix *src);
+int m_row_linear_independent(Matrix *src);
+long m_rank(Matrix *src);
+
 void m_print(Matrix *src);
 void m_label_print(Matrix *src, char *label);
 
-/*Matrix manipulation*/
-void m_transpose(Matrix *src, Matrix *dst);
-void m_mult(Matrix *src1, Matrix *src2, Matrix *dst);
+Matrix m_transpose(Matrix *src);
+Matrix m_mult(Matrix *src1, Matrix *src2);
+Matrix m_hadamard(Matrix *src1, Matrix *src2);
+Matrix m_identity_matrix(long I);
+Matrix m_diag(Matrix *src);
+Matrix m_cholesky_factor(Matrix *src);
+Matrix m_inverse(Matrix *src);
+
 void m_scmult(double scalar, Matrix *dst);
-void m_hadamard(Matrix *src1, Matrix *src2, Matrix *dst);
 void m_swap_rows(Matrix *dst, long a, long b);
-int m_inverse(Matrix *src, Matrix *dst); 
-Matrix m_create_transpose(Matrix *src);
-Matrix m_create_identity_matrix(long I);
-Matrix m_create_diag(Matrix *src);
-
-/*Useful for solving systems of linear equations*/
-void m_row_echelon(Matrix *dst); 
+void m_row_echelon(Matrix *dst);
+long m_row_echelon_count_swaps(Matrix *dst);
 void m_reduced_row_echelon(Matrix *dst);
-Matrix m_back_substitution(Matrix *src); 
+void m_standardize(Matrix *dst);
 
-/*Matrix statistics*/
-double m_trace(Matrix *src);
-double m_frobenius_norm(Matrix *src);
-int m_row_linear_independent(Matrix *src);
-int m_column_linear_independent(Matrix *src);
-long m_rank(Matrix *src);
-
-/*Data matrix manipulation*/
+Matrix m_mean(Matrix *src);
+Matrix m_stdev(Matrix *src);
 Matrix m_create_covariance_matrix(Matrix *src);
+Matrix m_back_substitution(Matrix *src);
+void m_qr_factorization(Matrix *src, Matrix *q, Matrix *r);
+Matrix m_eigenvalues(Matrix *src, long iterations);
+Matrix m_eigenvectors(Matrix *src);
 
-/*Machine learning algorithms*/
-Matrix m_PCA_dimensionality_reduction(Matrix *src, Matrix *proj, long k);
-
-typedef struct Tensor
-{
-    long rank;
-    long *dims;
-    
-    double *contents;
-} Tensor;
-Tensor t_init(long rank, ...);
-Tensor _t_init(long rank, long *dims);
-long *_t_index_weights(Tensor *t1);;
-long t_num_elements(Tensor *t1);
-void _t_print_linear(Tensor *t1, long d_index, long l, long r, long *index_weights);
-void t_print_linear(Tensor *t1);
-double t_get(Tensor *src, ...);
-void t_set(Tensor *dst, double val, ...);
-void t_add(Tensor *t1, Tensor *t2, Tensor *dst);
-void t_transpose(Tensor *src, Tensor *dst);
-Tensor t_create_transpose(Tensor *src);
-void t_copy_c_tensor(Tensor *dst, double *src, int num_elements);
 
 double dot_product(double *a, double *b, long len)
 {
@@ -134,16 +116,22 @@ void m_destroy(Matrix *dst)
 {
     free(dst->contents);
 }
-void m_copy(Matrix *src, Matrix *dst)
+Matrix m_copy(Matrix *src)
 {
+    Matrix out = m_init(src->rows, src->cols);
     for(long i = 0; i < src->cols * src->rows; i++)
     {
-        dst->contents[i] = src->contents[i];
+        out.contents[i] = src->contents[i];
     }
+    return out;
 }
 double m_get(Matrix *src, long row, long col)
 {
     return src->contents[row * src->cols + col];
+}
+void m_set(Matrix *dst, long row, long col, double val)
+{
+    dst->contents[row *dst->cols + col] = val;
 }
 double v_Lnorm(Matrix *src, long L)
 {
@@ -153,36 +141,6 @@ double v_Lnorm(Matrix *src, long L)
         sum += pow(src->contents[i], L);
     }
     return pow(sum, 1.0/L);
-}
-Matrix m_create_transition_matrix(Matrix *src1, Matrix *src2)
-{
-    Matrix out;
-    Matrix augmented_matrix;
-    Matrix solution;
-
-    out = m_init(src1->rows, src1->cols);
-    augmented_matrix = m_init(src1->rows, src1->cols + 1);
-    for(long i = 0; i < src1->cols; i++)
-    {
-        for(long j = 0; j < src2->rows; j++)
-        {
-            long k;
-            for(k = 0; k < src2->cols; k++)
-            {
-                augmented_matrix.contents[j * augmented_matrix.cols + k] = src2->contents[j * src2->cols + k];
-            }
-            augmented_matrix.contents[j * augmented_matrix.cols + k] = src1->contents[j * src1->cols + i];
-        }
-        m_row_echelon(&augmented_matrix);
-        solution = m_back_substitution(&augmented_matrix);
-        for(long j = 0; j < solution.rows; j++)
-        {
-            out.contents[j * out.cols + i] = solution.contents[j];
-        }
-    }
-    m_destroy(&solution);
-    m_destroy(&augmented_matrix);
-    return out;
 }
 void m_print(Matrix *src)
 {
@@ -215,46 +173,50 @@ void m_label_print(Matrix *src, char *label)
     }
     printf("\n");
 }
-void m_copy_c_matrix(void *src, Matrix *dst)
+Matrix m_copy_c_matrix(void *src, long rows, long cols)
 {
+    Matrix out = m_init(rows, cols);
     double *c_matrix = (double *)src;
 
-    for(long i = 0; i < dst->cols * dst->rows; i++)
-        dst->contents[i] = c_matrix[i];
+    for(long i = 0; i < out.cols * out.rows; i++)
+        out.contents[i] = c_matrix[i];
+    return out;
 }
-void m_transpose(Matrix *src, Matrix *dst)
+Matrix m_transpose(Matrix *src)
 {
-    for(long i = 0; i < dst->rows; i++)
-        for(long j = 0; j < dst->cols; j++)
-            dst->contents[i * dst->cols + j] = src->contents[j * src->cols + i];
-}
-Matrix m_create_transpose(Matrix *src)
-{
-    Matrix dst;
-    dst = m_init(src->cols, src-> rows);
-    m_transpose(src, &dst);
+    Matrix out;
+    out = m_init(src->cols, src->rows);
+    for(long i = 0; i < out.rows; i++)
+        for(long j = 0; j < out.cols; j++)
+            out.contents[i * out.cols + j] = src->contents[j * src->cols + i];
 
-    return dst;
+    return out;
 }
-void m_mult(Matrix *src1, Matrix *src2, Matrix *dst)
+/*Returns matrix containing src1@src2*/
+Matrix m_mult(Matrix *src1, Matrix *src2)
 {
-    Matrix src2_transpose = m_create_transpose(src2);
+    Matrix out = m_init(src1->rows, src2->cols);
+    Matrix src2_transpose = m_transpose(src2);
     for(long i = 0; i < src1->rows; i++)
         for(long j = 0; j < src2_transpose.rows; j++)
-            dst->contents[i * dst->cols + j] = dot_product(src1->contents + (i * src1->cols), src2_transpose.contents + (j * src2_transpose.cols), src1->cols);
+            out.contents[i * out.cols + j] = dot_product(src1->contents + (i * src1->cols), src2_transpose.contents + (j * src2_transpose.cols), src1->cols);
     m_destroy(&src2_transpose);
+    return out;
 }
+/*Scales dst by scalar*/
 void m_scmult(double scalar, Matrix *dst)
 {
     for(long i = 0; i < dst->cols * dst->rows; i++)
         dst->contents[i] *= scalar;
 }
-void m_hadamard(Matrix *src1, Matrix *src2, Matrix *dst)
+/*Returns matrix containing hadamard product of src1 and src2*/
+Matrix m_hadamard(Matrix *src1, Matrix *src2)
 {
+    Matrix out = m_init(src1->rows, src1->cols);
     for(long i = 0; i < src1->rows * src1->cols; i++)
-        dst->contents[i] = src1->contents[i] * src2->contents[i];
+        out.contents[i] = src1->contents[i] * src2->contents[i];
 }
-Matrix m_create_identity_matrix(long I)
+Matrix m_identity_matrix(long I)
 {
     Matrix out = m_init(I, I);
 
@@ -263,7 +225,7 @@ Matrix m_create_identity_matrix(long I)
         
     return out;
 }
-Matrix m_create_diag(Matrix *src)
+Matrix m_diag(Matrix *src)
 {
     Matrix out = m_init(src->cols, src->cols);
     for(long i = 0; i < src->cols; i++)
@@ -427,9 +389,8 @@ Matrix m_back_substitution(Matrix *src)
 }
 double m_determinant(Matrix *src)
 {
-    Matrix triangle = m_init(src->rows, src->cols);
+    Matrix triangle = m_copy(src);
 
-    m_copy(src, &triangle);
     long swaps = m_row_echelon_count_swaps(&triangle);
     double product = 1.0;
     for(long i = 0; i < src->rows; i++)
@@ -522,9 +483,7 @@ void m_standardize(Matrix *dst)
 /*q and r should be pointers to uninitialized matrices*/
 void m_qr_factorization(Matrix *src, Matrix *q, Matrix *r) 
 {
-    *q = m_init(src->rows, src->cols);
-    m_copy(src, q);
-    
+    *q = m_copy(src);
     *r = m_init(src->rows, src->cols);
 
     for(long i = 0; i < src->rows; i++)
@@ -560,14 +519,16 @@ void m_qr_factorization(Matrix *src, Matrix *q, Matrix *r)
 Matrix m_eigenvalues(Matrix *src, long iterations)
 {
     Matrix q, r;
-    Matrix a = m_init(src->rows, src->cols);
+    Matrix a = m_copy(src);
     Matrix out = m_init(src->rows, 1);
 
-    m_copy(src, &a);
     for(long i = 0; i < iterations; i++)
     {
+        Matrix temp = a;
+
         m_qr_factorization(&a, &q, &r);
-        m_mult(&r, &q, &a);
+        a = m_mult(&r, &q);
+        m_destroy(&temp);
         m_destroy(&q);
         m_destroy(&r);
     }
@@ -581,8 +542,7 @@ Matrix m_eigenvalues(Matrix *src, long iterations)
 /*Returns a matrix with eigenvectors listed as columns. Eigenvectors will have L2 norms equal to 1, and will be in descending order by eigenvalue*/
 Matrix m_eigenvectors(Matrix *src)
 {
-    Matrix out;
-    out = m_init(src->rows, src->cols);
+    Matrix out = m_init(src->rows, src->cols);
 
     Matrix eigenvalues = m_eigenvalues(src, 100);
     quicksort_descending(eigenvalues.contents, 0, eigenvalues.rows-1);
@@ -603,7 +563,6 @@ Matrix m_eigenvectors(Matrix *src)
         {
             augmented_matrix.contents[j * (augmented_matrix.cols + 1)] -= eigenvalues.contents[i];
         }
-
         m_row_echelon(&augmented_matrix);
 
         if(!is_equal_e(augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 1], 0.0, 1e-4, 1e-4) || !is_equal_e(augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 2], 0.0, 1e-4, 1e-4))
@@ -631,28 +590,6 @@ Matrix m_eigenvectors(Matrix *src)
 
     return out;
 }
-/*Takes in a data matrix, hopefully a standardized one, and reduces to k dimensional dataset. Compute v@proj to project column vector v onto the lower-dimensional plane*/
-Matrix m_PCA_dimensionality_reduction(Matrix *src, Matrix *proj, long k)
-{
-    Matrix covariance_matrix = m_create_covariance_matrix(src);
-    Matrix eigenvector_matrix = m_eigenvectors(&covariance_matrix);
-    m_destroy(&covariance_matrix);
-    *proj = m_init(eigenvector_matrix.rows, k);
-
-    for(long i = 0; i < proj->rows; i++)
-    {
-        for(long j = 0; j < k; j++)
-        {
-            proj->contents[i * proj->cols + j] = eigenvector_matrix.contents[i * eigenvector_matrix.cols + j];
-        }
-    }
-    m_destroy(&eigenvector_matrix);
-
-    Matrix new = m_init(src->rows, k);
-    m_mult(src, proj, &new);
-
-    return new;    
-}
 double m_trace(Matrix *src)
 {
     double sum = 0;
@@ -669,17 +606,20 @@ double m_frobenius_norm(Matrix *src)
 
     return sqrt(sum);
 }
- /*Calculates inverse if there is one, returns false iff there is none.*/
-int m_inverse(Matrix *src, Matrix *dst)
+ /*Calculates inverse if there is one, otherwise no memory will be allocated and rows and cols will equal 0*/
+Matrix m_inverse(Matrix *src)
 {
-    Matrix temp = m_init(dst->rows, dst->cols*2);
+    Matrix out;
+    Matrix temp = m_init(src->rows, src->cols*2);
+    out.rows = out.cols = 0;
+    
     for(long i = 0; i < temp.rows; i++)
     {
         temp.contents[i * (temp.cols + 1) + temp.rows] = 1.0;
     }
-    for(long i = 0; i < dst->rows; i++)
-        for(long j = 0; j < dst->cols; j++)
-            temp.contents[i * temp.cols + j] = src->contents[i * dst->cols + j];
+    for(long i = 0; i < src->rows; i++)
+        for(long j = 0; j < src->cols; j++)
+            temp.contents[i * temp.cols + j] = src->contents[i * src->cols + j];
     
     m_reduced_row_echelon(&temp);
 
@@ -690,21 +630,22 @@ int m_inverse(Matrix *src, Matrix *dst)
             if(i == j && !is_equal(temp.contents[2 * i * temp.cols + j], 1.0))
             {
                 m_destroy(&temp);
-                return 0;
+                return out;
             }
             else if(i != j && !is_equal(temp.contents[2 * i * temp.cols + j], 0.0))
             {
                 m_destroy(&temp);
-                return 0;
+                return out;
             }
         }
     } 
-    for(long i = 0; i < dst->rows; i++)
-        for(long j = 0; j < dst->cols; j++)
-            dst->contents[i * dst->cols + j] = temp.contents[i * temp.cols + temp.rows + j];
+    out = m_init(src->rows, src->cols);
+    for(long i = 0; i < src->rows; i++)
+        for(long j = 0; j < src->cols; j++)
+            out.contents[i * out.cols + j] = temp.contents[i * temp.cols + temp.rows + j];
     
     m_destroy(&temp);
-    return 1;
+    return out;
 }
 /*Returns true iff all columns in matrix are linearly independent*/
 int m_column_linear_independent(Matrix *src)
@@ -714,8 +655,7 @@ int m_column_linear_independent(Matrix *src)
     if(src->cols > src->rows)
         return 0;
 
-    temp = m_init(src->rows, src->cols);
-    m_copy(src, &temp);
+    temp = m_copy(src);
     m_row_echelon(&temp);
 
     for(long i = 0; i < temp.cols; i++)
@@ -737,7 +677,7 @@ int m_row_linear_independent(Matrix *src)
     if(src->cols > src->rows)
         return 0;
 
-    temp = m_create_transpose(src);
+    temp = m_transpose(src);
     m_row_echelon(&temp);
 
     for(long i = 0; i < temp.cols; i++)
@@ -756,7 +696,7 @@ long m_rank(Matrix *src)
     Matrix temp;
     long rank = 0;
 
-    temp = m_create_transpose(src);
+    temp = m_transpose(src);
     m_row_echelon(&temp);
 
     long i = 0;
@@ -888,168 +828,4 @@ Matrix m_create_covariance_matrix(Matrix *src)
         }
     }
     return out;
-}
-Tensor _t_init(long rank, long *dims)
-{
-    Tensor out;
-    double num_elements = 1;
-
-    out.rank = rank;
-    out.dims = malloc(sizeof(long) * rank);
-
-    for(long i = 0; i < rank; i++)
-    {
-        out.dims[i] = dims[i];
-        num_elements *= out.dims[i];
-    }
-    out.contents = calloc(num_elements, sizeof(double));
-    return out;
-}
-Tensor t_init(long rank, ...)
-{
-    Tensor out;
-    va_list list_ptr;
-    long *dims = malloc(sizeof(long) * rank);
-
-    va_start(list_ptr, rank);
-    for(long i = 0; i < rank; i++)
-        dims[i] = va_arg(list_ptr, long);
-    va_end(list_ptr);
-    out = _t_init(rank, dims);
-    free(dims);
-    return out;
-}
-void t_copy_c_tensor(Tensor *dst, double *src, int num_elements)
-{
-    for(long i = 0; i < num_elements; i++)
-        dst->contents[i] = src[i];
-}
-long t_num_elements(Tensor *t1)
-{
-    long i;
-    long element_count;
-    
-    element_count = 1;
-    for(i = 0; i < t1->rank; i++)
-        element_count *= t1->dims[i];
-
-    return element_count;
-}
-long *_t_index_weights(Tensor *t1)
-{
-    long *out = calloc(t1->rank, sizeof(long));
-    for(long i = 0; i < t1->rank; i++)
-    {
-        long product = 1;
-        for(long j = i + 1; j < t1->rank; j++)
-            product *= t1->dims[j];
-        out[i] = product;
-    }
-    return out;
-}
-void _t_print_linear(Tensor *t1, long d_index, long l, long r, long *index_weights)
-{
-    if(d_index >= t1->rank-1)
-    {
-        printf("[");
-        for(long i = l; i < r; i++)
-        {
-            printf("%lf", t1->contents[i]);
-            if(i < r-1)
-                printf(", ");
-        }
-        printf("]");
-        return;
-    }
-    else
-    {
-        printf("[");
-        for(long i = l; i < r; i += index_weights[d_index])
-        {
-            _t_print_linear(t1, d_index+1, i, i+index_weights[d_index], index_weights);
-        }
-        printf("]");
-    }
-}
-void t_print_linear(Tensor *t1)
-{
-    long *index_weights = _t_index_weights(t1);
-    _t_print_linear(t1, 0, 0, t_num_elements(t1), index_weights);
-    printf("\n");
-    free(index_weights);
-}
-double t_get(Tensor *src, ...)
-{
-    va_list list_ptr;
-    long get_index;
-
-    get_index = 0;
-
-    va_start(list_ptr, src);
-    for(long i = 0; i < src->rank; i++)
-        get_index += va_arg(list_ptr, long) * src->dims[i];
-    va_end(list_ptr);
-
-    return src->contents[get_index];
-}
-void t_set(Tensor *dst, double val, ...)
-{
-    va_list list_ptr;
-    long set_index;
-
-    set_index = 0;
-
-    va_start(list_ptr, val);
-    for(long i = 0; i < dst->rank; i++)
-        set_index += va_arg(list_ptr, long) * dst->dims[i];
-    va_end(list_ptr);
-
-    dst->contents[set_index] = val;
-}
-void t_add(Tensor *t1, Tensor *t2, Tensor *dst)
-{
-    for(long i = 0; i < t_num_elements(t1); i++)
-        dst->contents[i] = t2->contents[i] + t1->contents[i];
-}
-void t_transpose(Tensor *src, Tensor *dst)
-{
-    long *indices = calloc(src->rank, sizeof(long));
-    long *index_weights = _t_index_weights(dst);
-
-    for(long i = 0; i < t_num_elements(src); i++)
-    {
-        long set_index = 0;
-        for(long j = 0; j < dst->rank; j++)
-            set_index += indices[j] * index_weights[dst->rank-j-1];
-        dst->contents[set_index] = src->contents[i];
-
-        for(long j = src->rank-1; j >= 0; j--)
-        {
-            if(src->dims[j] > indices[j]+1)
-            {
-                indices[j]++;
-                memset((indices + j + 1), 0, sizeof(long)*(src->rank - j - 1));
-                break;
-            }
-        }
-    }
-    free(indices);
-    free(index_weights);
-}
-Tensor t_create_transpose(Tensor *src)
-{
-    Tensor out;
-
-    long *reverse_dims = malloc(sizeof(long) * src->rank);
-    for(long i = 0; i < src->rank; i++)
-        reverse_dims[i] = src->dims[src->rank-i-1];
-
-    out = _t_init(src->rank, reverse_dims);     
-    t_transpose(src, &out);
-    return out;
-}
-void t_destroy(Tensor *t1)
-{
-    free(t1->contents);
-    free(t1->dims);
 }

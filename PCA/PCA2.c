@@ -1,4 +1,4 @@
-#include "../linalg/linalg_parallel.h"
+#include "../c_ml.h"
 int main(int argc, char **argv)
 {
     if(argc < 2)
