@@ -7,4 +7,6 @@ Most of the example programs will have an accompanying python script that calls 
 Things done so far:
   - A crude linear algebra library
   - A PCA implementation and example program
+  - Implementation of Lloyds K-means algorithm applied to 4 dimensional data set reduced to 3 dimensions with PCA
+   
 
