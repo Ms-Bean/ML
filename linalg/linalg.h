@@ -28,6 +28,7 @@ double m_get(Matrix *src, long row, long col);
 void m_set(Matrix *dst, long row, long col, double val);
 
 double v_Lnorm(Matrix *src, long L);
+double v_L2norm(Matrix *src, long L);
 double m_determinant(Matrix *src);
 double m_trace(Matrix *src);
 double m_frobenius_norm(Matrix *src);
@@ -40,6 +41,8 @@ void m_label_print(Matrix *src, char *label);
 
 Matrix m_transpose(Matrix *src);
 Matrix m_mult(Matrix *src1, Matrix *src2);
+Matrix m_add(Matrix *src1, Matrix *src2);
+Matrix m_sub(Matrix *src1, Matrix *src2);
 Matrix m_hadamard(Matrix *src1, Matrix *src2);
 Matrix m_identity_matrix(long I);
 Matrix m_diag(Matrix *src);
@@ -59,7 +62,7 @@ Matrix m_create_covariance_matrix(Matrix *src);
 Matrix m_back_substitution(Matrix *src);
 void m_qr_factorization(Matrix *src, Matrix *q, Matrix *r);
 Matrix m_eigenvalues(Matrix *src, long iterations);
-Matrix m_eigenvectors(Matrix *src);
+Matrix m_eigenvectors(Matrix *src, long iterations);
 
 
 double dot_product(double *a, double *b, long len)
@@ -142,6 +145,15 @@ double v_Lnorm(Matrix *src, long L)
     }
     return pow(sum, 1.0/L);
 }
+double v_L2norm(Matrix *src, long L)
+{    
+    double sum;
+    for(long i = 0; i < src->cols*src->rows; i++)
+    {
+        sum += pow(src->contents[i], L);
+    }
+    return(sqrt(sum));
+}
 void m_print(Matrix *src)
 {
     for(long i = 0; i < src->rows; i++)
@@ -192,6 +204,29 @@ Matrix m_transpose(Matrix *src)
 
     return out;
 }
+/*Returns src1+src2*/
+Matrix m_add(Matrix *src1, Matrix *src2)
+{
+    Matrix out = m_init(src1->rows, src1->cols);
+
+    for(long i = 0; i < src1->rows * src1->cols; i++)
+    {
+        out.contents[i] = src1->contents[i] + src2->contents[i];
+    }
+    return out;
+}
+/*Returns src1-src2*/
+Matrix m_sub(Matrix *src1, Matrix *src2)
+{
+
+    Matrix out = m_init(src1->rows, src1->cols);
+
+    for(long i = 0; i < src1->rows * src1->cols; i++)
+    {
+        out.contents[i] = src1->contents[i] - src2->contents[i];
+    }
+    return out;
+}
 /*Returns matrix containing src1@src2*/
 Matrix m_mult(Matrix *src1, Matrix *src2)
 {
@@ -215,6 +250,7 @@ Matrix m_hadamard(Matrix *src1, Matrix *src2)
     Matrix out = m_init(src1->rows, src1->cols);
     for(long i = 0; i < src1->rows * src1->cols; i++)
         out.contents[i] = src1->contents[i] * src2->contents[i];
+    return out;
 }
 Matrix m_identity_matrix(long I)
 {
@@ -488,7 +524,6 @@ void m_qr_factorization(Matrix *src, Matrix *q, Matrix *r)
 
     for(long i = 0; i < src->rows; i++)
     {
-        double s = 0;
         for(long j = 0; j < i; j++)
         {
             double s = 0.0;
@@ -540,54 +575,28 @@ Matrix m_eigenvalues(Matrix *src, long iterations)
     return out;
 }
 /*Returns a matrix with eigenvectors listed as columns. Eigenvectors will have L2 norms equal to 1, and will be in descending order by eigenvalue*/
-Matrix m_eigenvectors(Matrix *src)
+Matrix m_eigenvectors(Matrix *src, long iterations)
 {
-    Matrix out = m_init(src->rows, src->cols);
-
-    Matrix eigenvalues = m_eigenvalues(src, 100);
-    quicksort_descending(eigenvalues.contents, 0, eigenvalues.rows-1);
-
-    Matrix augmented_matrix = m_init(src->rows, src->cols + 1);
-    for(long i = 0; i < eigenvalues.rows; i++)
+    Matrix q, r;
+    Matrix out = m_identity_matrix(src->rows);
+    Matrix a = m_copy(src);
+    for(long i = 0; i < iterations; i++)
     {
-        for(long j = 0; j < src->rows; j++)
-        {
-            long k;
-            for(k = 0; k < src->cols; k++)
-            {
-                augmented_matrix.contents[augmented_matrix.cols * j + k] = src->contents[src->cols * j + k];
-            }
-            augmented_matrix.contents[augmented_matrix.cols * j + k] = 0;
-        }
-        for(long j = 0; j < src->rows; j++)
-        {
-            augmented_matrix.contents[j * (augmented_matrix.cols + 1)] -= eigenvalues.contents[i];
-        }
-        m_row_echelon(&augmented_matrix);
+        Matrix temp = a;
 
-        if(!is_equal_e(augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 1], 0.0, 1e-4, 1e-4) || !is_equal_e(augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 2], 0.0, 1e-4, 1e-4))
+        m_qr_factorization(&a, &q, &r);
+        a = m_mult(&r, &q);
+        Matrix eigenvectors_new = m_mult(&out, &q);
+        for(long i = 0; i < eigenvectors_new.rows * eigenvectors_new.cols; i++)
         {
-            printf("%0.16lf\n", augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 1]);
-            printf("Eigenvector computation failed for eigenvalue %0.16lf\n", eigenvalues.contents[i]);
+            out.contents[i] = eigenvectors_new.contents[i];
         }
-        augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 1] = 1;
-        augmented_matrix.contents[(augmented_matrix.rows - 1) * augmented_matrix.cols + augmented_matrix.cols - 2] = 1;
-        Matrix solution = m_back_substitution(&augmented_matrix);
-
-        if(solution.rows != 0)
-        {
-            double weight = 1.0/v_Lnorm(&solution, 2);
-            m_scmult(weight, &solution);
-            for(long j = 0; j < solution.rows; j++)
-            {
-                out.contents[j * out.cols + i] = solution.contents[j];
-            }
-        }
-        m_destroy(&solution);
+        m_destroy(&eigenvectors_new);
+        m_destroy(&temp);
+        m_destroy(&q);
+        m_destroy(&r);
     }
-    m_destroy(&augmented_matrix);
-    m_destroy(&eigenvalues);
-
+    m_destroy(&a);
     return out;
 }
 double m_trace(Matrix *src)
@@ -791,6 +800,24 @@ Matrix m_read_csv(char *filename)
     }
     fclose(fp);
     return out;
+}
+/*Writes a matrix to a csv file. header should contain labels for each column like "x,y,z"*/
+void m_export_csv(Matrix *src, char *filename, char *header)
+{
+    FILE *fp = fopen(filename, "w");
+
+    fprintf(fp, "%s\n", header);
+    for(long i = 0; i < src->rows; i++)
+    {
+        long j;
+        for(j = 0; j < src->cols-1; j++)
+        {
+            fprintf(fp, "%lf,", src->contents[i * src->cols + j]);
+        }
+        if(j != 0)
+            fprintf(fp, "%lf\n", src->contents[i * src->cols + j]);
+    }
+    fclose(fp);
 }
 /*Takes in a data matrix, creates a covariance matrix*/
 Matrix m_create_covariance_matrix(Matrix *src)
