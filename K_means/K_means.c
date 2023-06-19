@@ -10,8 +10,8 @@ int main(int argc, char **argv)
     Matrix data = m_read_csv(argv[1]);
     m_standardize(&data);
     Matrix proj;
-    Matrix reduced = m_PCA_dimensionality_reduction(&data, &proj, 3);
-    Matrix centroid_matrix = m_k_means_clustering(&reduced, 10, 3);
+    Matrix reduced = PCA_dimensionality_reduction(&data, &proj, 3);
+    Matrix centroid_matrix = k_means_clustering(&reduced, 3);
 
     Matrix column_vector = m_init(3, 1);
 

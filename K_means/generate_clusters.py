@@ -17,7 +17,7 @@ for i in range(150):
 
 f = open("data.csv", "w")
 writer = csv.writer(f)
-writer.writerow(['x', 'y', 'z'])
+writer.writerow(['w', 'x', 'y', 'z'])
 for i in range(150):
     writer.writerow([dat[0][i], dat[1][i], dat[2][i], dat[3][i]])
 f.close()

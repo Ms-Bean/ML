@@ -2,8 +2,8 @@
 #include <time.h>
 #include <limits.h>
 
-Matrix m_PCA_dimensionality_reduction(Matrix *src, Matrix *proj, long k);
-Matrix m_k_means_clustering(Matrix *src, int iters, long k);
+Matrix PCA_dimensionality_reduction(Matrix *src, Matrix *proj, long k);
+Matrix k_means_clustering(Matrix *src, long k);
 long k_means_predict(Matrix *point, Matrix *centroid_matrix);
 
 
@@ -12,7 +12,7 @@ Takes in a standardized data matrix, and reduces to k dimensions.
 proj should be pointer to uninitialized matrix
 Compute v@proj to project column vector v onto the lower-dimensional plane
 */
-Matrix m_PCA_dimensionality_reduction(Matrix *src, Matrix *proj, long k)
+Matrix PCA_dimensionality_reduction(Matrix *src, Matrix *proj, long k)
 {
     Matrix covariance_matrix = m_create_covariance_matrix(src);
     Matrix eigenvector_matrix = m_eigenvectors(&covariance_matrix, 1000);
@@ -31,7 +31,7 @@ Matrix m_PCA_dimensionality_reduction(Matrix *src, Matrix *proj, long k)
     return m_mult(src, proj);
 }
 /*Takes in a data matrix and k, returns data matrix containing the centroids of each cluster*/
-Matrix m_k_means_clustering(Matrix *src, int iters, long k)
+Matrix k_means_clustering(Matrix *src, long k)
 {
     if(src->rows < k)
     {
@@ -54,7 +54,8 @@ Matrix m_k_means_clustering(Matrix *src, int iters, long k)
         for(int q = 0; q < sizeof(long)/sizeof(unsigned char); q++)
         {
             unsigned char c = rand();
-            row |= c << (8 * sizeof(unsigned char) * q);
+            row <<= (8 * sizeof(unsigned char));
+            row |= c;
         }
         row = abs(row % src->rows);
         int unique = 0;
