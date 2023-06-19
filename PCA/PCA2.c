@@ -10,7 +10,7 @@ int main(int argc, char **argv)
     m_standardize(&m);
     
     Matrix Ut;
-    Matrix reduced = m_PCA_dimensionality_reduction(&m, &Ut, 2);
+    Matrix reduced = PCA_dimensionality_reduction(&m, &Ut, 2);
     printf("a,b\n");
     for(long i = 0; i < reduced.rows; i++)
     {

@@ -45,8 +45,6 @@ for row in reader:
     b_axis.append(float(row['b']))
 
 g = plt.figure(2)
-plt.xlim(-3, 3)
-plt.ylim(-3, 3)
 plt.scatter(a_axis, b_axis, s=85)
 g.show()
 
